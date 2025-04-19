@@ -4,10 +4,7 @@ This is for csc 4101 Project II
 Shift Reduce Parser is a type of buttom-up parsing. It generates the parse tree from leaves to the root.
 ------------------------------------------------
 shift  | reduce
+
 accept | error
 ------------------------------------------------
 ### My goal is to parse any input expression based on the grammar in Javascript
-
-1. create a SRP table ✅ 
-2. adding grammar rules & input promote  ✅ 
-3. Functionalities
