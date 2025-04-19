@@ -102,43 +102,68 @@ const srpTableData = {
         { state: '11', actions: { '+': 'R5', '*': 'R5', ')': 'R5', '$': 'R5' }, gotos: {} },
     ]
 };
-
+// Get HTML element to display SRP_TABLE
 const parserContainer = document.getElementById("parser-context");
+//create table by datas
 parserContainer.appendChild(createSRPTable(srpTableData));
-
+//create table where it shows individual steps
 const outputTable = document.querySelector("#output tbody");
 
-
+//output table section
 let currentStep = 0;
 let parsingSteps = [];
 let isParsingComplete = false;
 
 function addOutputRow(step, stack, input, action) {
     const row = document.createElement("tr");
+    //fill the row with 4 columns
     row.innerHTML = `
         <td>${step}</td>
         <td>${stack}</td>
         <td>${input}</td>
         <td>${action}</td>
     `;
+    //add the row to table
     outputTable.appendChild(row);
 }
 
 // parsing
 function parseInput(input) {
-    const tokens = input.trim().split(/\s+/); // split input into tokens 
+    //check for proper input firstly --- $
+    if (!input.trim().endsWith('$')) {
+        parsingSteps = [{
+            step: 0,
+            stack: [],
+            input: input.split(/\s+/),
+            action: "Error: Missing '$'"
+        }];
+        return; 
+    }
+
+    // split input into tokens from "id + id" into "id", "+", "id"
+    const tokens = input.trim().split(/\s+/);  
     let stack = [0];
     let pointer = 0;
-    let step = 1;
+    let step = 0;
     parsingSteps = [];
     currentStep = 0;
     isParsingComplete = false;
 
+    //initilize the process with step 0
+    parsingSteps.push({
+        step:step,
+        stack: [...stack],
+        input: [...tokens],
+        action: " "
+    });
+    step++;
+
+    //while loop until error or accept
     while (true) {
         //get current state and next symbol
         const state = stack[stack.length - 1];
         const symbol = tokens[pointer];
-        //get action from table
+        //get action: shift, reduce, or accept
         const action = getAction(state, symbol);
         //error case
         if (!action) {
@@ -162,6 +187,7 @@ function parseInput(input) {
         }
         //shift case
         if (action.startsWith('S')) {
+            //only get number part-- S5->5
             const nextState = parseInt(action.slice(1));
             stack.push(symbol);
             stack.push(nextState);
@@ -175,7 +201,9 @@ function parseInput(input) {
         } 
         //reduce case
         if (action.startsWith('R')) {
+            //get 2 from R2
             const ruleNum = parseInt(action.slice(1));
+            //get the grammar rule according to the number
             const rule = getRule(ruleNum);
             const popCount = rule.right.length * 2;
 
@@ -214,7 +242,7 @@ document.getElementById("input-submit").addEventListener("click", () => {
     outputTable.innerHTML = ""; // Clear previous output
     parseInput(input);
     document.getElementById('next-step').disabled = false;
-    showNextStep(); // Show first step immediately
+    showNextStep();
 });
 
 document.getElementById("next-step").addEventListener("click", showNextStep);
