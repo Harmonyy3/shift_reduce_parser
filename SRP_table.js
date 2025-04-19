@@ -1,20 +1,16 @@
-//my firstaim for this page is to create a SRP table 
 
 function createSRPTable(data) {
     const table = document.createElement('table');
-    table.style.width = '50%';
-    table.style.textAlign = 'center';
     const style = document.createElement('style');
     style.textContent = `
         td,th {
-            padding: 5px;
             border: 1px solid black;
-            font-size: 20px;
+            
         }
         th {
             background-color: pink;
         } 
-    `; //style for the table
+    `;
 
     document.head.appendChild(style);
 
@@ -107,5 +103,140 @@ const srpTableData = {
     ]
 };
 
-document.body.appendChild(createSRPTable(srpTableData));
+const parserContainer = document.getElementById("parser-context");
+parserContainer.appendChild(createSRPTable(srpTableData));
 
+const outputTable = document.querySelector("#output tbody");
+
+
+let currentStep = 0;
+let parsingSteps = [];
+let isParsingComplete = false;
+
+function addOutputRow(step, stack, input, action) {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+        <td>${step}</td>
+        <td>${stack}</td>
+        <td>${input}</td>
+        <td>${action}</td>
+    `;
+    outputTable.appendChild(row);
+}
+
+// parsing
+function parseInput(input) {
+    const tokens = input.trim().split(/\s+/); // split input into tokens 
+    let stack = [0];
+    let pointer = 0;
+    let step = 1;
+    parsingSteps = [];
+    currentStep = 0;
+    isParsingComplete = false;
+
+    while (true) {
+        //get current state and next symbol
+        const state = stack[stack.length - 1];
+        const symbol = tokens[pointer];
+        //get action from table
+        const action = getAction(state, symbol);
+        //error case
+        if (!action) {
+            parsingSteps.push({
+                step: step,
+                stack: [...stack],
+                input: tokens.slice(pointer),
+                action: "Error"
+            });
+            break;
+        }
+        //accept case
+        if (action === 'accept') {
+            parsingSteps.push({
+                step: step,
+                stack: [...stack],
+                input: tokens.slice(pointer),
+                action: "Accept"
+            });
+            break;
+        }
+        //shift case
+        if (action.startsWith('S')) {
+            const nextState = parseInt(action.slice(1));
+            stack.push(symbol);
+            stack.push(nextState);
+            pointer++;
+            parsingSteps.push({
+                step: step,
+                stack: [...stack],
+                input: tokens.slice(pointer),
+                action: `Shift ${symbol}`
+            });
+        } 
+        //reduce case
+        if (action.startsWith('R')) {
+            const ruleNum = parseInt(action.slice(1));
+            const rule = getRule(ruleNum);
+            const popCount = rule.right.length * 2;
+
+            for (let i = 0; i < popCount; i++) stack.pop();
+
+            const topState = stack[stack.length - 1];
+            const nextState = getGoto(topState, rule.left);
+            stack.push(rule.left);
+            stack.push(nextState);
+
+            parsingSteps.push({
+                step: step,
+                stack: [...stack],
+                input: tokens.slice(pointer),
+                action: `Reduce by ${rule.left} → ${rule.right.join(' ')}`
+            });
+        }
+        step++;
+    }
+}
+
+function showNextStep() {
+    if (currentStep < parsingSteps.length) {
+        const step = parsingSteps[currentStep];
+        addOutputRow(step.step, step.stack.join(' '), step.input.join(' '), step.action);
+        currentStep++;
+    } else if (!isParsingComplete) {
+        isParsingComplete = true;
+        document.getElementById('next-step').disabled = true;
+    }
+}
+
+document.getElementById("input-submit").addEventListener("click", () => {
+    const inputField = document.getElementById("inputg");
+    const input = inputField.value;
+    outputTable.innerHTML = ""; // Clear previous output
+    parseInput(input);
+    document.getElementById('next-step').disabled = false;
+    showNextStep(); // Show first step immediately
+});
+
+document.getElementById("next-step").addEventListener("click", showNextStep);
+
+function getAction(state, symbol) {
+    const row = srpTableData.rows.find(r => r.state === state.toString());
+    return row?.actions[symbol];
+}
+
+function getGoto(state, nonTerm) {
+    const row = srpTableData.rows.find(r => r.state === state.toString());
+    return parseInt(row?.gotos[nonTerm]);
+}
+
+function getRule(num) {
+    const rules = [
+        { left: 'E', right: ['E', '+', 'T'] },
+        { left: 'E', right: ['T'] },
+        { left: 'T', right: ['T', '*', 'F'] },
+        { left: 'T', right: ['F'] },
+        { left: 'F', right: ['(', 'E', ')'] },
+        { left: 'F', right: ['id'] }
+    ];
+    return rules[num - 1];
+}
