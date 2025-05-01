@@ -1,5 +1,5 @@
-
 //define parsing table & grammar rule agian for functionality 
+//easier to identify with number object
 const parsing_data = {
     1:{ state: '0', action: { 'id': 'S5', '(': 'S4' }, goto: { 'E': '1', 'T': '2', 'F': '3' }},
     2:{ state: '1', action: { '+': 'S6', '$': 'accept' }, goto: {} },
@@ -22,48 +22,33 @@ const rule = {
     5:{ left: 'F', right: ['(', 'E', ')'] },
     6:{ left: 'F', right: ['id'] }
 };
-//step by step table---look for output table body by id 
-const outputT = document.getElementById("data");
-function output_table(step, stack, input, action) {
-    const row = document.createElement("tr");
-    //fill the row with 4 columns
-    row.innerHTML = `
-        <td>${step}</td>
-        <td>${stack}</td>
-        <td>${input}</td>
-        <td>${action}</td>
-    `;
-    //add the data to table
-    outputT.appendChild(row);
-}
 //global value
-    let step = 0, index=0, currentStep=0;
+    let step = 0, index=0, current_step=0;
     let stack = [0];
     let output = [];
-
 // parsing functionality
-function parseInput(input) {
-    step = 0, index=0, currentStep=0;
+function start_parsing(input) {
+    step = 0, index=0, current_step=0;
     stack = [0];
     output = [];
     //split input into tokens from "id + id" into "id", "+", "id"
     //input.trim() ignore the spaces
     const tokens = input.trim().split(/\s+/); //--input 
-    //if input is null, throw errors message
-    if (input.length<1)
+    //if tokens is null, throw errors message
+    if (tokens.length<1)
     {
         document.getElementById("message").textContent=("Invalid input");
         return;
     }
 
-    //first check if input comes with $, if not throw errors message
-    if (!input.trim().endsWith('$'))
+    //first check if tokens comes with $, if not throw errors message
+    if (tokens[tokens.length-1]!=('$'))
     {
         document.getElementById("message").textContent=("Missing $");
         return;
     }
 
-    //step 0 
+    //step 0 for iniatilization
     output.push({
         step:  step,
         stack: [...stack],
@@ -74,39 +59,41 @@ function parseInput(input) {
 
     //while loop until error or accept
     while (true) {
-        //get current state and next operator
-        //stack = [0 id 5] ---> 5
-        const state = stack[stack.length - 1];
-        const operator = tokens[index];
-        //get action: shift, reduce, or accept
-        const action = action_op(state, operator);
-        //error case -- if action==empty
+        //get current state num and next operator symbol
+        //stack = [0 id 5] ---> 5 --- to get the last stack
+        const state = stack[stack.length - 1];//rows num
+        const operator = tokens[index];//columns
+        //action_op(rows, columns) --> result == shift || reduce || accept
+        //if (rows, columns) fall into a empty spot then it is error case
+        const result = action_op(state, operator);
+        //error case -- if result is empty
         //eg: [a,b,c,d] -> .slice(1) -> [b,c,d] or we can use substring
-        if (!action) {
+        if (!result) {
             output.push({
                 step: step,
                 stack: [...stack],
                 input: tokens.slice(index),
                 action: "Error"
             });
-            break;
+            break;//break the loop
         }
         //accept case by comparsion
-        if (action == 'accept') {
+        if (result == 'accept') {
             output.push({   
                 step: step,
                 stack: [...stack],
                 input: tokens.slice(index),
                 action: "Accept"
             });
-            break; //end it 
+            break; //break the loop
         }
-        //shift case -- with grammar rules
-        if (action.startsWith('S')) {
-            //get number part-- S5->5
-            const nextState = parseInt(action.slice(1));
+        //shift case
+        if (result[0]==('S')) {
+            //slice() get number part-- 'S5'->'5'
+            //parseInt() converts a string to num, so '5' -> 5
+            const num = parseInt(result.slice(1));
             stack.push(operator);
-            stack.push(nextState);
+            stack.push(num);
             index++;
             output.push({
                 step: step,
@@ -115,61 +102,82 @@ function parseInput(input) {
                 action: `Shift ${operator}`
             });
         } 
-        //reduce case
-        if (action.startsWith('R')) {
+        //reduce case -- wil grammar rules
+        if (result[0]==('R')) {
             //get 2 from R2
-            const number = parseInt(action.slice(1));
+            const num = parseInt(result.slice(1));
             //get the grammar rule according to the number
-            const rule1 = rule[number];
-            const count = rule1.right.length * 2;
+            const rule1 = rule[num];
+            const count = rule1.right.length * 2;//number to pop off stack
+            //eg:  stack = 0E1+6(4T2*7F10 ---> reduced by T->T*F
+            //             state operator state operator
+            //so we need to take off 6 index, 10 F 7 * 2 T
+            //it becomes 0E1+6(4 --- end with state
+            // and replace with new T, 4T->2 ------> so 0E1+6(4T2
 
             for (let i = 0; i < count; i++) 
                 {
-                    stack.pop();
+                    stack.pop(); //stack if LIFO
                 }
-            const topState = stack[stack.length - 1];
-            const nextState = goto_op(topState, rule1.left);
-            stack.push(rule1.left);
-            stack.push(nextState);
+            const last_state = stack[stack.length - 1];
+            const next_state = goto_op(last_state, rule1.left);
+            stack.push(rule1.left); //it was end with state, so continuing with operator
+            stack.push(next_state); //then state
 
             output.push({
                 step: step,
                 stack: [...stack],
                 input: tokens.slice(index),
-                action: `Reduce by ${rule1.left} → ${rule1.right.join(' ')}`
+                action: `Reduce by ${rule1.left} → ${rule1.right.join(' ')}` // join('') --> no seperator & converts output to single string
             });
         }
-        step++;
+        step++; 
     }
 }
 //sumbit button feature
-document.getElementById("sumbit").addEventListener("click", () => {
-    const inputfield = document.getElementById("input"); //inputFeild is not a string, cant use it directly
-    const input_value = inputfield.value;
-    outputT.innerHTML = ""; //make sure clear the previous history
-    parseInput(input_value); // transfer parameter to the parsing function
+document.getElementById("sumbit").addEventListener("click", () => {    
+    //import input from user 
+    const realinput=document.getElementById("input").value;
+    outputT.innerHTML = ""; //make sure clear any previous history
+    start_parsing(realinput); // transfer parameter to the parsing function
     show_process();
 });
 
 //next buttom -- show each process one by one
 document.getElementById("next").addEventListener("click", show_process);
 function show_process() {
-    if (currentStep < output.length) {
-        const step = output[currentStep];
+    if (current_step < output.length) {
+        const step = output[current_step];
         output_table(step.step, step.stack.join(' '), step.input.join(' '), step.action);
-        currentStep++;
+        current_step++;
     } 
     else
     document.getElementById('next').disabled=true;
 }
 
-function action_op(state, operator) {
-    //Object.values() finding through numbers
-    const row = Object.values(parsing_data).find(r => r.state == state);
-    return row?.action[operator];
+//step by step table---look for output table body in HTML by id 
+const outputT = document.getElementById("data");
+function output_table(step, stack, input, action) {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+        <td>${step}</td>
+        <td>${stack}</td>
+        <td>${input}</td>
+        <td>${action}</td>
+    `;
+    //add the data to table
+    outputT.appendChild(row);
 }
 
-function goto_op(state, goto_value) {
-    const row = Object.values(parsing_data).find(r => r.state == state);
-    return parseInt(row?.goto[goto_value]);
+function action_op(state, operator) {
+    //Object.values() finding through numbers
+    const list = Object.values(parsing_data).find(num => num.state == state);
+    const result=list?.action[operator];//? -> only look for action if state is matched and defiend, and find the specific item
+    return result;
+}
+//for reduce session, goto_op(last_state, rule1.left)
+function goto_op(last_state, rule1_left) {
+    const list = Object.values(parsing_data).find(num => num.state == last_state);
+    const result=parseInt(list?.goto[rule1_left])
+    return result; //return int
 }
